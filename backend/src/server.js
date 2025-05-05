@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 import { envConfig } from './config/env/env.config.js';
+import ConnectDb from './config/db/connectDB.js';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(envConfig.PORT, () => {
+  ConnectDb()
   console.log(`Le serveur Mentorat est démarré sur le port ${envConfig.PORT}`);
 });
 
