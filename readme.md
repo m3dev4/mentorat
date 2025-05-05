@@ -1,6 +1,6 @@
 # Mentora
 
-![Mentora Logo]("/mentorat.png")
+![Mentora Logo]("./mentorat.png")
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
