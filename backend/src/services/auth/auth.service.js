@@ -44,7 +44,7 @@ const sendVerificationEmail = async (user, req) => {
     await sendEmail({
       email: user.email,
       subject: 'Vérification de votre adresse email - Mentorat',
-      html: emailVerificationTemplate({ verificationURL }),
+      html: emailVerificationTemplate(verificationURL),
     });
     console.log(`Email envoyé avec succès à ${user.email}`);
   } catch (error) {
