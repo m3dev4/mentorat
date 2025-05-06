@@ -64,3 +64,5 @@ const isEmailVerified = asyncHandler(async (req, res, next) => {
   }
   next();
 });
+
+export { protect, restrictTo, isEmailVerified };
