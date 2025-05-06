@@ -49,6 +49,7 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^6.7.0",
+    "promisify": "^0.0.3",
     "qrcode": "^1.5.4",
     "recaptcha-v3": "^1.11.3",
     "redis": "^5.0.0",
