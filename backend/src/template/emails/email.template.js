@@ -1,4 +1,4 @@
-export const emailVerificationTemplate = `
+export const emailVerificationTemplate = verificationURL => `
 <!DOCTYPE html>
 <html>
 <head>
