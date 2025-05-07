@@ -6,9 +6,12 @@ import {
   generateToken,
   generateRefreshToken,
   sendVerificationEmail,
+  blacklistToken,
+  invalidateUserCache,
 } from '../../services/auth/auth.service.js';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { cacheService } from '../../services/cache/redis.service.js';
 
 // Fonction utilitaire pour envoyer les tokens de reponse
 const sendTokenResponse = (user, statusCode, req, res) => {
@@ -46,10 +49,21 @@ const sendTokenResponse = (user, statusCode, req, res) => {
 export const register = asyncHandler(async (req, res, next) => {
   try {
     const { firstName, lastName, email, password } = req.body;
-    // verifier si l'utilisateur existe deja
-    const userExists = await User.findOne({ email });
+    
+    // Vérifier si l'utilisateur existe déjà (avec cache)
+    const cacheKey = `email:${email}`;
+    let userExists = await cacheService.get(cacheKey);
+    
+    if (!userExists) {
+      userExists = await User.findOne({ email });
+      // Mettre en cache le résultat pour 5 minutes
+      if (userExists) {
+        await cacheService.set(cacheKey, true, 5 * 60);
+      }
+    }
+    
     if (userExists) {
-      return next(new AppError("L'utilisateur existe deja", 400));
+      return next(new AppError("L'utilisateur existe déjà", 400));
     }
 
     // Créer un nouvel utilisateur
@@ -67,7 +81,7 @@ export const register = asyncHandler(async (req, res, next) => {
     sendTokenResponse(newUser, 201, req, res);
   } catch (error) {
     if (error.code === 11000) {
-      return next(new AppError("L'email est deja utilise", 400));
+      return next(new AppError("L'email est déjà utilisé", 400));
     }
 
     if (error.name === 'ValidationError') {
@@ -81,15 +95,33 @@ export const register = asyncHandler(async (req, res, next) => {
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password, stayConnected } = req.body;
 
-  // Verifier si l'email et le mdp sont fournir
+  // Verifier si l'email et le mdp sont fournis
   if (!email || !password) {
     return next(new AppError('Veuillez fournir un email et un mot de passe', 400));
   }
   
-  // Trouver l'utilisateur par email et inclure le mot de passe
-  const user = await User.findOne({ email }).select('+password');
+  // Essayer de récupérer l'utilisateur depuis le cache
+  const cacheKey = `login:${email}`;
+  let user = await cacheService.get(cacheKey);
   
-  // Verifier si l'utilsiateur existe
+  if (!user) {
+    // Trouver l'utilisateur par email et inclure le mot de passe
+    user = await User.findOne({ email }).select('+password');
+    
+    // Ne pas mettre en cache les informations sensibles comme le mot de passe
+    // Mais on peut mettre en cache l'existence de l'utilisateur
+    if (user) {
+      const userWithoutPassword = { ...user.toObject() };
+      delete userWithoutPassword.password;
+      // Mettre en cache pour 5 minutes
+      await cacheService.set(`user:${userWithoutPassword._id}`, userWithoutPassword, 5 * 60);
+    }
+  } else {
+    // Si l'utilisateur est récupéré du cache, on doit quand même obtenir le mot de passe
+    user = await User.findById(user._id).select('+password');
+  }
+  
+  // Verifier si l'utilisateur existe
   if (!user) {
     return next(new AppError('Email ou mot de passe incorrect', 401));
   }
@@ -100,12 +132,15 @@ export const login = asyncHandler(async (req, res, next) => {
     return next(new AppError('Email ou mot de passe incorrect', 401));
   }
   
-  // Mettre à jour l'option rester conncetr si fournir
+  // Mettre à jour l'option rester connecté si fournie
   if (stayConnected !== undefined) {
     user.stayConnected = stayConnected;
     await user.save({ validateBeforeSave: false });
+    // Invalider le cache pour cet utilisateur
+    await invalidateUserCache(user._id);
   }
-  // Enregistrer les information de connexion
+  
+  // Enregistrer les informations de connexion
   const loginInfo = {
     date: Date.now(),
     ip: req.ip,
@@ -115,13 +150,24 @@ export const login = asyncHandler(async (req, res, next) => {
   user.loginHistory.push(loginInfo);
   user.lastActive = Date.now();
   await user.save({ validateBeforeSave: false });
+  
+  // Invalider le cache pour cet utilisateur
+  await invalidateUserCache(user._id);
 
-  // Envoyer la reponse avec le token
+  // Envoyer la réponse avec le token
   sendTokenResponse(user, 200, req, res);
 });
 
-// Deconnexion
+// Déconnexion
 export const logout = asyncHandler(async (req, res, next) => {
+  // Récupérer le token
+  const token = req.cookies.jwt || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+  
+  if (token) {
+    // Ajouter le token à la liste noire dans Redis
+    await blacklistToken(token, envConfig.JWT_EXPIRES_IN);
+  }
+  
   // Effacer les cookies
   res.cookie('jwt', 'loggedout', {
     expires: new Date(Date.now() + 10 * 1000),
@@ -133,36 +179,50 @@ export const logout = asyncHandler(async (req, res, next) => {
     path: '/api/v1/auth/refresh-token',
   });
 
-  res.status(200).json({ status: 'success', message: 'Deconnexion reussie' });
+  res.status(200).json({ status: 'success', message: 'Déconnexion réussie' });
 });
 
 // Vérification de l'email
 export const verifyEmail = asyncHandler(async (req, res, next) => {
-  //Recurperer le token
+  //Récupérer le token
   const { token } = req.params;
 
-  // Hasher le token pour le comparer avec celui stocké en base
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  // Vérifier d'abord dans le cache
+  const userId = await cacheService.get(`email_verification:${token}`);
+  let user;
+  
+  if (userId) {
+    user = await User.findById(userId);
+  } else {
+    // Hasher le token pour le comparer avec celui stocké en base
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-  //Trouver l'utilisateur avec le token et verifier qu'il n'est pas exiprer
-  const user = await User.findOne({
-    emailVerificationToken: hashedToken,
-    emailVerificationExpires: { $gt: Date.now() },
-  });
+    // Trouver l'utilisateur avec le token et vérifier qu'il n'est pas expiré
+    user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+  }
 
   if (!user) {
     return next(new AppError('Token invalide ou expiré', 400));
   }
-  // Marquer l'email comme verifier et supprimer le token
+  
+  // Marquer l'email comme vérifié et supprimer le token
   user.isEmailVerified = true;
   user.emailVerificationToken = undefined;
   user.emailVerificationExpires = undefined;
   await user.save({ validateBeforeSave: false });
+  
+  // Supprimer du cache
+  await cacheService.delete(`email_verification:${token}`);
+  // Invalider le cache utilisateur
+  await invalidateUserCache(user._id);
 
-  // Rediriger vers la page de connexion ou envoyer une reponse JSON
+  // Rediriger vers la page de connexion ou envoyer une réponse JSON
   res.status(200).json({
     status: 'success',
-    message: 'Email verifié avec succès',
+    message: 'Email vérifié avec succès',
   });
 });
 

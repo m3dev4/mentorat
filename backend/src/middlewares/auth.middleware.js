@@ -4,6 +4,7 @@ import AppError from './appError.middleware.js';
 import asyncHandler from './asyncHandler.middleware.js';
 import jwt from 'jsonwebtoken';
 import { promisify } from 'util';
+import { isTokenBlacklisted, getUserById } from '../services/auth/auth.service.js';
 
 const protect = asyncHandler(async (req, res, next) => {
   try {
@@ -19,11 +20,17 @@ const protect = asyncHandler(async (req, res, next) => {
       return next(new AppError("Vous n'êtes pas authentifié", 401));
     }
 
+    // Vérifier si le token est dans la liste noire (déconnecté)
+    const isBlacklisted = await isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      return next(new AppError("Token invalide ou expiré. Veuillez vous reconnecter.", 401));
+    }
+
     //Verifier si le token est valide
     const decoded = await promisify(jwt.verify)(token, envConfig.JWT_SECRET);
 
-    //Verifier si l'utilisateur existe
-    const currentUser = await User.findById(decoded.id);
+    //Verifier si l'utilisateur existe (avec cache)
+    const currentUser = await getUserById(decoded.id);
 
     if (!currentUser) {
       return next(new AppError("L'utilisateur associé à ce token n'existe pas.", 401));

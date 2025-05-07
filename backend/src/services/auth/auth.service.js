@@ -4,15 +4,16 @@ import crypto from 'crypto';
 import { envConfig } from '../../config/env/env.config.js';
 import { emailVerificationTemplate } from '../../template/emails/email.template.js';
 import { sendEmail } from '../../mailers/mailer.js';
+import { cacheService } from '../cache/redis.service.js';
 
-//Génerer un token JWT
+// Génerer un token JWT
 const generateToken = id => {
   return jwt.sign({ id }, envConfig.JWT_SECRET, {
     expiresIn: envConfig.JWT_EXPIRES_IN,
   });
 };
 
-//Générer un refresh token
+// Générer un refresh token
 const generateRefreshToken = id => {
   return jwt.sign({ id }, envConfig.JWT_REFRESH_SECRET, {
     expiresIn: envConfig.JWT_REFRESH_EXPIRES_IN,
@@ -29,6 +30,13 @@ const sendVerificationEmail = async (user, req) => {
   const verificationURL = `${req.protocol}://${req.get(
     'host',
   )}/api/v1/auth/verify-email/${verificationToken}`;
+
+  // Stocker le token dans le cache pour une vérification rapide
+  await cacheService.set(
+    `email_verification:${verificationToken}`, 
+    user.id, 
+    24 * 60 * 60 // 24 heures
+  );
 
   // En développement, afficher les informations dans la console
   if (envConfig.NODE_ENV !== 'production') {
@@ -61,4 +69,59 @@ const sendVerificationEmail = async (user, req) => {
   return verificationToken;
 };
 
-export { generateRefreshToken, generateToken, sendVerificationEmail };
+// Vérifier si un token est dans la liste noire (déconnexion)
+const isTokenBlacklisted = async (token) => {
+  return await cacheService.exists(`blacklist:${token}`);
+};
+
+// Ajouter un token à la liste noire lors de la déconnexion
+const blacklistToken = async (token, expiresIn) => {
+  // Convertir expiresIn (ex: '1h') en secondes
+  let ttl = 3600; // 1 heure par défaut
+  if (typeof expiresIn === 'string') {
+    const unit = expiresIn.slice(-1);
+    const value = parseInt(expiresIn.slice(0, -1));
+    
+    if (unit === 'h') ttl = value * 3600;
+    else if (unit === 'd') ttl = value * 86400;
+    else if (unit === 'm') ttl = value * 60;
+  }
+  
+  return await cacheService.set(`blacklist:${token}`, true, ttl);
+};
+
+// Récupérer un utilisateur avec mise en cache
+const getUserById = async (userId) => {
+  // Essayer de récupérer l'utilisateur depuis le cache
+  const cacheKey = `user:${userId}`;
+  const cachedUser = await cacheService.get(cacheKey);
+  
+  if (cachedUser) {
+    return cachedUser;
+  }
+  
+  // Si non trouvé dans le cache, récupérer depuis la base de données
+  const user = await User.findById(userId);
+  
+  if (user) {
+    // Mettre en cache pour les prochaines requêtes (15 minutes)
+    await cacheService.set(cacheKey, user.toObject(), 15 * 60);
+  }
+  
+  return user;
+};
+
+// Invalider le cache utilisateur lors des mises à jour
+const invalidateUserCache = async (userId) => {
+  return await cacheService.delete(`user:${userId}`);
+};
+
+export { 
+  generateRefreshToken, 
+  generateToken, 
+  sendVerificationEmail,
+  isTokenBlacklisted,
+  blacklistToken,
+  getUserById,
+  invalidateUserCache
+};
