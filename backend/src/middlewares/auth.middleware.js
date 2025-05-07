@@ -23,7 +23,7 @@ const protect = asyncHandler(async (req, res, next) => {
     // Vérifier si le token est dans la liste noire (déconnecté)
     const isBlacklisted = await isTokenBlacklisted(token);
     if (isBlacklisted) {
-      return next(new AppError("Token invalide ou expiré. Veuillez vous reconnecter.", 401));
+      return next(new AppError('Token invalide ou expiré. Veuillez vous reconnecter.', 401));
     }
 
     //Verifier si le token est valide

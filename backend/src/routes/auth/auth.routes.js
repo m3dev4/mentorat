@@ -1,25 +1,23 @@
 import express from 'express';
 import {
-    getMe,
+  getMe,
+  register,
   login,
   logout,
-  refreshToken,
-  register,
-  resendVerificationEmail,
-  updatePassword,
-  updateProfile,
   verifyEmail,
+  updateProfile,
+  updatePassword,
 } from '../../controllers/auth/auth.controller.js';
+import { authRateLimit } from '../../middlewares/rateLimit.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
-router.post('/register', register);
-router.post('/login', login);
-router.post('/logout', logout);
-router.post('/verify-email/:token', verifyEmail);
-router.post('/resend-verification', resendVerificationEmail);
-router.post('/refresh-token', refreshToken);
+// Appliquer la limite de taux aux routes d'authentification
+router.post('/register', authRateLimit, register);
+router.post('/login', authRateLimit, login);
+router.get('/logout', logout);
+router.get('/verify-email/:token', verifyEmail);
 
 //Route proteger
 router.use(protect);

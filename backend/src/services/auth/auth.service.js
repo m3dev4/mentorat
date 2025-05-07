@@ -33,9 +33,9 @@ const sendVerificationEmail = async (user, req) => {
 
   // Stocker le token dans le cache pour une vérification rapide
   await cacheService.set(
-    `email_verification:${verificationToken}`, 
-    user.id, 
-    24 * 60 * 60 // 24 heures
+    `email_verification:${verificationToken}`,
+    user.id,
+    24 * 60 * 60, // 24 heures
   );
 
   // En développement, afficher les informations dans la console
@@ -70,7 +70,7 @@ const sendVerificationEmail = async (user, req) => {
 };
 
 // Vérifier si un token est dans la liste noire (déconnexion)
-const isTokenBlacklisted = async (token) => {
+const isTokenBlacklisted = async token => {
   return await cacheService.exists(`blacklist:${token}`);
 };
 
@@ -81,47 +81,53 @@ const blacklistToken = async (token, expiresIn) => {
   if (typeof expiresIn === 'string') {
     const unit = expiresIn.slice(-1);
     const value = parseInt(expiresIn.slice(0, -1));
-    
+
     if (unit === 'h') ttl = value * 3600;
     else if (unit === 'd') ttl = value * 86400;
     else if (unit === 'm') ttl = value * 60;
   }
-  
+
   return await cacheService.set(`blacklist:${token}`, true, ttl);
 };
 
 // Récupérer un utilisateur avec mise en cache
-const getUserById = async (userId) => {
+const getUserById = async userId => {
   // Essayer de récupérer l'utilisateur depuis le cache
   const cacheKey = `user:${userId}`;
   const cachedUser = await cacheService.get(cacheKey);
-  
+
   if (cachedUser) {
+    console.log(`Utilisateur ${userId} récupéré depuis le cache`);
     return cachedUser;
   }
-  
+
   // Si non trouvé dans le cache, récupérer depuis la base de données
   const user = await User.findById(userId);
-  
+
   if (user) {
     // Mettre en cache pour les prochaines requêtes (15 minutes)
-    await cacheService.set(cacheKey, user.toObject(), 15 * 60);
+    const userObject = user.toObject();
+    // Ne pas mettre le mot de passe en cache
+    delete userObject.password;
+    await cacheService.set(cacheKey, userObject, 15 * 60);
+    console.log(`Utilisateur ${userId} mis en cache`);
   }
-  
+
   return user;
 };
 
 // Invalider le cache utilisateur lors des mises à jour
-const invalidateUserCache = async (userId) => {
+const invalidateUserCache = async userId => {
+  console.log(`Invalidation du cache pour l'utilisateur ${userId}`);
   return await cacheService.delete(`user:${userId}`);
 };
 
-export { 
-  generateRefreshToken, 
-  generateToken, 
+export {
+  generateRefreshToken,
+  generateToken,
   sendVerificationEmail,
   isTokenBlacklisted,
   blacklistToken,
   getUserById,
-  invalidateUserCache
+  invalidateUserCache,
 };
