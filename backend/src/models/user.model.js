@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { genSalt, hash, compare } from 'bcryptjs';
+import bcrypt, { genSalt, hash } from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
 
 const userSchema = new Schema({
@@ -220,8 +220,12 @@ userSchema.pre('save', async function(next) {
 });
 
 // Méthode pour comparer les mots de passe
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await compare(candidatePassword, this.password);
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  // Vérifier que les deux arguments sont définis
+  if (!this.password || !candidatePassword) {
+    return false;
+  }
+  return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Méthode pour générer un token de vérification d'email

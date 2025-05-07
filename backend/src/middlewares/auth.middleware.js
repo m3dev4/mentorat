@@ -1,9 +1,9 @@
 import { envConfig } from '../config/env/env.config.js';
 import User from '../models/user.model.js';
-import AppError from './appError.middleware';
+import AppError from './appError.middleware.js';
 import asyncHandler from './asyncHandler.middleware.js';
 import jwt from 'jsonwebtoken';
-import promisify from 'util';
+import { promisify } from 'util';
 
 const protect = asyncHandler(async (req, res, next) => {
   try {

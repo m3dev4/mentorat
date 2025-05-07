@@ -85,12 +85,21 @@ export const login = asyncHandler(async (req, res, next) => {
   if (!email || !password) {
     return next(new AppError('Veuillez fournir un email et un mot de passe', 400));
   }
+  
   // Trouver l'utilisateur par email et inclure le mot de passe
   const user = await User.findOne({ email }).select('+password');
-  // Verifier si l'utilsiateur existe et si le mdp est correct
-  if (!user || !(await user.comparePassword(password))) {
+  
+  // Verifier si l'utilsiateur existe
+  if (!user) {
     return next(new AppError('Email ou mot de passe incorrect', 401));
   }
+  
+  // Vérifier si le mot de passe est correct
+  const isPasswordCorrect = await user.comparePassword(password);
+  if (!isPasswordCorrect) {
+    return next(new AppError('Email ou mot de passe incorrect', 401));
+  }
+  
   // Mettre à jour l'option rester conncetr si fournir
   if (stayConnected !== undefined) {
     user.stayConnected = stayConnected;
@@ -184,18 +193,67 @@ export const resendVerificationEmail = asyncHandler(async (req, res, next) => {
   });
 });
 
-export const rafreshToken = asyncHandler(async (req, res, next) => {
+export const refreshToken = asyncHandler(async (req, res, next) => {
   // recuperer le refreshToken
   const { refreshToken } = req.cookies;
 
   if (!refreshToken) {
     return next(new AppError('Veuillez vous reconnecter', 401));
   }
-  const decoded = jwt.verify('refreshToken', envConfig.JWT_REFRESH_SECRET);
+  // Corriger la référence à la variable d'environnement
+  const decoded = jwt.verify(refreshToken, envConfig.JWT_SECRET_REFRESH);
 
   const user = await User.findById(decoded.id);
   if (!user) {
     return next(new AppError('Utilisateur non trouvé', 404));
   }
   sendTokenResponse(user, 200, req, res);
+});
+
+// User profile
+export const getMe = asyncHandler(async (req, res, next) => {
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: req.user,
+    },
+  });
+});
+
+// Mettre à jour le mot de passe
+export const updatePassword = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('+password');
+
+  if (!(await user.comparePassword(req.body.currentPassword))) {
+    return next(new AppError('Mot de passe actuel incorrect', 401));
+  }
+
+  user.password = req.body.newPassword;
+  await user.save();
+
+  sendTokenResponse(user, 200, req, res);
+});
+
+// Profile mettre à jour
+export const updateProfile = asyncHandler(async (req, res, next) => {
+  const { bio, location, profilePicture, languages, timezone } = req.body;
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return next(new AppError('Utilisateur non trouvé', 404));
+  }
+  user.bio = bio;
+  user.location = location;
+  user.profilePicture = profilePicture;
+  user.languages = languages;
+  user.timezone = timezone;
+
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user,
+    },
+  });
 });
