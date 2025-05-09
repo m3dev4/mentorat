@@ -141,4 +141,19 @@ body {
   .bg-layout {
     background-color: #FF5733;
   }
+  .bg-hero{
+    background-color: #FFF0F0;
+  }
+  .text-hero{
+    font-size: 65px;
+    font-family: Arial;
+    font-weight: bold;
+  }
+  .text-layout{
+    color: #FF5733;
+  }
+  .text-para{
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font-size: 15px;
+  }
 }

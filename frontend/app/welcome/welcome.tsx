@@ -9,8 +9,8 @@ const Welcome = () => {
   return (
     <main className="w-full h-full ">
         <NavBar />
-        <div className="flex flex-col items-center justify-center m-auto p-auto overflow-auto h-full w-full max-w-7xl">
         <Hero />
+        <div className="flex flex-col items-center justify-center m-auto p-auto overflow-auto h-full w-full max-w-7xl">
         <Cta />
         <Instructors />
         <Footer />
