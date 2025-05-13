@@ -1,7 +1,7 @@
-import { AuthStateStore } from "~/api/auth/authStore";
+import { AuthStateStore } from "../../api/auth/authStore";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { authApi } from "~/utils/api/auth/authApi";
-import type { User } from "~/types/authType";
+import { authApi } from "../../utils/api/auth/authApi";
+import type { User } from "../../types/authType";
 
 export const useRegister = () => {
   const { login } = AuthStateStore();

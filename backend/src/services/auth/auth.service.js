@@ -26,10 +26,8 @@ const sendVerificationEmail = async (user, req) => {
   const verificationToken = user.createEmailVerificationToken();
   await user.save({ validateBeforeSave: false });
 
-  // Construire l'URL de vérification
-  const verificationURL = `${req.protocol}://${req.get(
-    'host',
-  )}/api/v1/auth/verify-email/${verificationToken}`;
+  // Construire l'URL de vérification qui pointe vers le frontend
+  const verificationURL = `${envConfig.FRONTEND_URL}/auth/verify-email/${verificationToken}`;
 
   // Stocker le token dans le cache pour une vérification rapide
   await cacheService.set(

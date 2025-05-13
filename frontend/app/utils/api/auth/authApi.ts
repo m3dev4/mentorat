@@ -1,4 +1,4 @@
-import axiosInstance from "~/lib/instances/auth/autInstance";
+import axiosInstance from "../../../lib/instances/auth/autInstance";
 import type {
   AuthResponse,
   LoginRequest,
@@ -6,7 +6,7 @@ import type {
   UpdatePasswordRequest,
   UpdateProfileRequest,
   User,
-} from "~/types/authType";
+} from "../../../types/authType";
 
 export const authApi = {
   register: async (data: RegisterRequest): Promise<AuthResponse> => {

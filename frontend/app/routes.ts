@@ -14,6 +14,10 @@ export default [
                 path: "register",
                 file: "routes/auth/register/register.tsx",
             },
+            {
+                path: "verify-email/:token",
+                file: "routes/auth/emailVerify/verify-email.tsx",
+            },
         ],
     },
 ] satisfies RouteConfig;

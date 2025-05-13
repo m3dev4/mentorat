@@ -27,6 +27,7 @@ const appConfig = () => {
     EMAIL_USERNAME: getEnv('EMAIL_USER'),
     EMAIL_PASSWORD: getEnv('EMAIL_PASSWORD'),
     EMAIL_FROM: getEnv('EMAIL_FROM', 'noreply@mentorat.com'),
+    FRONTEND_URL: getEnv('FRONTEND_URL', 'http://localhost:5173'),
   };
 };
 
