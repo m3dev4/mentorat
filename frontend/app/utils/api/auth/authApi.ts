@@ -20,10 +20,26 @@ export const authApi = {
   },
 
   logout: async (): Promise<{ status: string; message: string }> => {
+    // Récupérer le token depuis le localStorage
+    const token = localStorage.getItem('token');
+    
+    // Configurer les en-têtes avec le token
+    const config = {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      withCredentials: true, // Pour envoyer les cookies
+    };
+    
     const response = await axiosInstance.get<{
       status: string;
       message: string;
-    }>("/auth/logout");
+    }>("/auth/logout", config);
+    
+    // Supprimer les tokens du localStorage après la déconnexion
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    
     return response.data;
   },
 
