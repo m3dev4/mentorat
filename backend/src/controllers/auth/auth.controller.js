@@ -8,6 +8,7 @@ import {
   sendVerificationEmail,
   blacklistToken,
   invalidateUserCache,
+  getUserById,
 } from '../../services/auth/auth.service.js';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
@@ -298,17 +299,28 @@ export const updatePassword = asyncHandler(async (req, res, next) => {
 export const updateProfile = asyncHandler(async (req, res, next) => {
   const { bio, location, profilePicture, languages, timezone } = req.body;
 
-  const user = await User.findById(req.user.id);
+  // Utiliser l'ID directement depuis la requête authentifiée
+  const userId = req.user.id || req.user._id; // Accepter les deux formats d'ID possibles
+  
+  // Récupérer l'utilisateur directement depuis la base de données
+  const user = await User.findById(userId);
   if (!user) {
+    console.error(`Utilisateur avec ID ${userId} non trouvé dans la base de données`);
     return next(new AppError('Utilisateur non trouvé', 404));
   }
-  user.bio = bio;
-  user.location = location;
-  user.profilePicture = profilePicture;
-  user.languages = languages;
-  user.timezone = timezone;
+  
+  // Mettre à jour les propriétés
+  if (bio !== undefined) user.bio = bio;
+  if (location !== undefined) user.location = location;
+  if (profilePicture !== undefined) user.profilePicture = profilePicture;
+  if (languages !== undefined) user.languages = languages;
+  if (timezone !== undefined) user.timezone = timezone;
 
+  // Sauvegarder les modifications
   await user.save();
+  
+  // Invalider le cache pour cet utilisateur
+  await invalidateUserCache(userId);
 
   res.status(200).json({
     status: 'success',

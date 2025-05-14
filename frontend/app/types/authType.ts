@@ -6,6 +6,17 @@ export interface User {
   roles: string[];
   isEmailVerified: boolean;
   profilePicture?: string;
+  bio?: string;
+  location?: {
+    country: string;
+    city: string;
+    isPublic?: boolean;
+  };
+  languages?: Array<{
+    language: string;
+    level: "debutant" | "intermediaire" | "avance" | "natif";
+  }>;
+  timezone?: string;
 }
 
 //Definition du type pour l'etat d'authentification
