@@ -11,6 +11,7 @@ import { apiRateLimit } from './middlewares/rateLimit.middleware.js';
 
 import authRoutes from './routes/auth/auth.routes.js';
 import trainerRoutes from './routes/trainer/trainer.route.js';
+import categoryRoutes from './routes/category/category.route.js';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(apiRateLimit);
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/trainer', trainerRoutes);
+app.use('/api/v1/categories', categoryRoutes);
 
 app.get('/', (req, res) => {
   res.json({
