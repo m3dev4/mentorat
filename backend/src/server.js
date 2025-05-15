@@ -10,6 +10,7 @@ import { connectRedis } from './config/cache/redis.config.js';
 import { apiRateLimit } from './middlewares/rateLimit.middleware.js';
 
 import authRoutes from './routes/auth/auth.routes.js';
+import trainerRoutes from './routes/trainer/trainer.route.js';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use(morgan('dev'));
 app.use(apiRateLimit);
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/trainer', trainerRoutes);
 
 app.get('/', (req, res) => {
   res.json({
