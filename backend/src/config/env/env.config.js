@@ -17,6 +17,7 @@ const appConfig = () => {
     DOCKERHUB_USERNAME: getEnv('DOCKERHUB_USERNAME'),
     DOCKERHUB_TOKEN: getEnv('DOCKERHUB_TOKEN'),
     MONGODB_URI: getEnv('MONGODB_URI'),
+    POSTGRES_URI: getEnv('POSTGRES_URI'),
     // Utiliser des valeurs par défaut pour les secrets JWT en développement
     JWT_SECRET: getEnv('JWT_SECRET_KEY', isDevelopment ? DEV_JWT_SECRET : ''),
     JWT_EXPIRES_IN: getEnv('JWT_EXPIRES_IN', '30d'),

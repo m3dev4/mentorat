@@ -1,0 +1,278 @@
+// src/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URI")
+}
+
+// Modèles pour les cours
+model Course {
+  id                 String    @id @default(uuid())
+  title              String
+  slug               String    @unique
+  subtitle           String?
+  description        String
+  objectives         String[]
+  prerequisites      String?
+  level              Level
+  price              Float
+  currency           String    @default("EUR")
+  discountPrice      Float?
+  discountValidUntil DateTime?
+  
+  // Relations avec MongoDB (utilisation d'IDs externes)
+  categoryId         String
+  instructorId       String
+  coInstructorIds    String[]
+  
+  // Relations PostgreSQL
+  modules            Module[]
+  enrollments        Enrollment[]
+  comments           Comment[]
+  
+  // Configuration
+  sequentialProgress Boolean    @default(true)
+  certificateEnabled Boolean    @default(true)
+  
+  // Métadonnées
+  status             CourseStatus @default(DRAFT)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  publishedAt        DateTime?
+  
+  // Stats
+  enrolledStudents   Int         @default(0)
+  completionRate     Float       @default(0)
+  
+  @@index([slug])
+  @@index([categoryId])
+  @@index([instructorId])
+}
+
+model Module {
+  id               String    @id @default(uuid())
+  title            String
+  description      String
+  order            Int
+  
+  // Relations
+  courseId         String
+  course           Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons          Lesson[]
+  
+  // Évaluation
+  hasAssessment    Boolean   @default(false)
+  assessmentType   AssessmentType?
+  passingScore     Int?
+  
+  // Déverrouillage
+  unlockDate       DateTime?
+  
+  // Métadonnées
+  duration         Int       @default(0) // en minutes
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  @@index([courseId])
+  @@unique([courseId, order])
+}
+
+model Lesson {
+  id               String    @id @default(uuid())
+  title            String
+  description      String?
+  order            Int
+  type             LessonType
+  
+  // Contenu selon le type
+  videoUrl         String?
+  htmlContent      String?
+  duration         Int?      // en minutes
+  
+  // Relations
+  moduleId         String
+  module           Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress         LessonProgress[]
+  comments         Comment[]
+  resources        Resource[]
+  
+  // Interaction
+  commentsEnabled  Boolean   @default(true)
+  
+  // Métadonnées
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  @@index([moduleId])
+  @@unique([moduleId, order])
+}
+
+model Resource {
+  id               String    @id @default(uuid())
+  title            String
+  type             String
+  url              String
+  description      String?
+  
+  // Relation
+  lessonId         String
+  lesson           Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime  @default(now())
+  
+  @@index([lessonId])
+}
+
+model Enrollment {
+  id                 String    @id @default(uuid())
+  userId             String    // ID de l'utilisateur dans MongoDB
+  courseId           String
+  course             Course    @relation(fields: [courseId], references: [id])
+  
+  // Statut général
+  status             EnrollmentStatus @default(ACTIVE)
+  enrolledAt         DateTime  @default(now())
+  lastActivityAt     DateTime  @default(now())
+  completionPercentage Float    @default(0)
+  
+  // Paiement
+  paymentStatus      PaymentStatus @default(PENDING)
+  paymentAmount      Float
+  transactionId      String?
+  
+  // Progression
+  moduleProgresses   ModuleProgress[]
+  lessonProgresses   LessonProgress[]
+  
+  // Certification
+  certificateIssued  Boolean   @default(false)
+  certificateUrl     String?
+  certificateIssuedAt DateTime?
+  
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model ModuleProgress {
+  id               String    @id @default(uuid())
+  enrollmentId     String
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  moduleId         String
+  
+  status           ProgressStatus @default(NOT_STARTED)
+  completedLessons Int       @default(0)
+  assessmentScore  Float?
+  assessmentCompleted Boolean @default(false)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  
+  @@unique([enrollmentId, moduleId])
+  @@index([moduleId])
+}
+
+model LessonProgress {
+  id               String    @id @default(uuid())
+  enrollmentId     String
+  enrollment       Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId         String
+  lesson           Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  status           ProgressStatus @default(NOT_STARTED)
+  timeSpent        Int       @default(0) // en minutes
+  lastPosition     Int       @default(0) // pour les vidéos (secondes)
+  completedAt      DateTime?
+  
+  @@unique([enrollmentId, lessonId])
+}
+
+model Comment {
+  id               String    @id @default(uuid())
+  userId           String    // ID de l'utilisateur dans MongoDB
+  content          String
+  
+  // Relations
+  courseId         String
+  course           Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId         String?
+  lesson           Lesson?   @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  
+  // Hiérarchie
+  isQuestion       Boolean   @default(false)
+  parentId         String?
+  parent           Comment?  @relation("CommentToComment", fields: [parentId], references: [id], onDelete: SetNull)
+  replies          Comment[] @relation("CommentToComment")
+  
+  // Modération
+  status           CommentStatus @default(PUBLISHED)
+  
+  // Interactions
+  likes            Int       @default(0)
+  isResolved       Boolean   @default(false)
+  resolvedByUserId String?
+  
+  // Horodatage
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  @@index([courseId])
+  @@index([lessonId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+// Énumérations
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum CourseStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  QUIZ
+  EXERCISE
+}
+
+enum AssessmentType {
+  QUIZ
+  PROJECT
+  EXERCISE
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PAID
+  REFUNDED
+  PENDING
+}
+
+enum CommentStatus {
+  PUBLISHED
+  PENDING
+  HIDDEN
+}
