@@ -4,8 +4,9 @@ import Category from '../../models/category.model.js';
 import AppError from '../../middlewares/appError.middleware.js';
 import { syncTrainerCourse } from '../../services/sync/sync.Service.js';
 import { PrismaClient } from '@prisma/client';
+import mongoose from 'mongoose';
 
-const primsa = new PrismaClient();
+const prisma = new PrismaClient();
 
 // src/controllers/course/course.controller.js (corrections)
 export const createCourse = asyncHandler(async (req, res, next) => {
@@ -81,4 +82,41 @@ export const getAllCourses = asyncHandler(async (req, res, next) => {
   } catch (error) {
     return next(new AppError(error.message, 500));
   }
+});
+
+// Obtenir un cours par ID ou slug
+export const getCourse = asyncHandler(async (req, res, next) => {
+  const { idOrSlug } = req.params;
+
+  // Recherche par ID ou slug
+  const query = mongoose.Types.ObjectId.isValid(idOrSlug) ? { _id: idOrSlug } : { slug: idOrSlug };
+
+  const course = await Course.findOne(query)
+    .populate('instructor', 'firstName lastName profilePicture biography')
+    .populate('category', 'name slug');
+
+  if (!course) {
+    return next(new AppError('Cours non trouvé', 404));
+  }
+
+  // Pour les détails complets (modules, leçons), récupérer depuis PostgreSQL
+  const pgCourseDetails = await prisma.course.findUnique({
+    where: { id: course._id.toString() },
+    include: {
+      modules: {
+        include: {
+          lessons: true,
+        },
+        orderBy: { order: 'asc' },
+      },
+    },
+  });
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      course,
+      modules: pgCourseDetails?.modules || [],
+    },
+  });
 });
