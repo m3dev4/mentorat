@@ -11,7 +11,9 @@ import {
 import { authRateLimit } from '../../middlewares/rateLimit.middleware.js';
 import { protect } from '../../middlewares/auth.middleware.js';
 
+
 const router = express.Router();
+
 
 // Appliquer la limite de taux aux routes d'authentification
 router.post('/register', authRateLimit, register);

@@ -13,24 +13,42 @@ import authRoutes from './routes/auth/auth.routes.js';
 import trainerRoutes from './routes/trainer/trainer.route.js';
 import categoryRoutes from './routes/category/category.route.js';
 import courseRoutes from './routes/course/course.route.js';
-
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(cors({
-  origin: envConfig.FRONTEND_URL,
-  
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: envConfig.FRONTEND_URL,
+
+    credentials: true,
+  }),
+);
 app.use(morgan('dev'));
 
 // Appliquer la limite de taux globale
 app.use(apiRateLimit);
 
-app.use('/api/v1/auth', authRoutes);
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 10, // 10 tentatives par heure
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Trop de tentatives de connexion, veuillez réessayer dans une heure',
+});
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // 1000 requêtes par fenêtre
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Trop de requêtes, veuillez réessayer plus tard',
+});
+
+app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/trainer', trainerRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/courses', courseRoutes);

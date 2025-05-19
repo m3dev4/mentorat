@@ -5,6 +5,7 @@ import AppError from '../../middlewares/appError.middleware.js';
 import { syncTrainerCourse } from '../../services/sync/sync.Service.js';
 import { PrismaClient } from '@prisma/client';
 import mongoose from 'mongoose';
+import { courseSchema } from '../../validators/course.validator.js';
 
 const prisma = new PrismaClient();
 
@@ -15,6 +16,12 @@ export const createCourse = asyncHandler(async (req, res, next) => {
     const user = req.user;
     if (!user) {
       return next(new AppError('Vous devez être connecté pour créer un cours', 401));
+    }
+
+    const { error, value } = courseSchema.validate(req.body);
+
+    if (error) {
+      return next(new AppError(error.details[0].message, 400));
     }
 
     // Récupérer l'ID correctement (peut être dans différentes propriétés selon votre auth)
